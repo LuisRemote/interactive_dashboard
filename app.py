@@ -8,7 +8,9 @@ st.set_page_config(page_title="Sales Dashboard",
                     layout="wide"
 )
 
-df = pd.read_excel(
+@st.cache
+def get_data_from_excel():
+    df = pd.read_excel(
         io='supermarkt_sales.xlsx',
         engine='openpyxl',
         sheet_name='Sales',
@@ -16,6 +18,12 @@ df = pd.read_excel(
         usecols='B:R',
         nrows=1000,
 )
+    # Add 'hour' column to dataframe
+    df["hour"] = pd.to_datetime(df["Time"], format="%H:%M:%S").dt.hour
+    return df
+
+df = get_data_from_excel()
+
 
 
 # ------ SIDEBAR ------
@@ -43,9 +51,11 @@ df_selection = df.query(
 )
 
 
+
 # ---- MAINPAGE ----
 st.title(":bar_chart: Sales Dashboard")
 st.markdown("##")
+
 
 
 # Top KPI's
@@ -69,6 +79,7 @@ with right_column:
 st.markdown("---")
 
 
+
 # Sales by product line [Bar chart]
 sales_by_product_line = (
         df_selection.groupby(by=["Product line"]).sum()[["Total"]].sort_values(by="Total")
@@ -84,11 +95,47 @@ fig_product_sales = px.bar(
         template="plotly_white",
 )
 
-st.plotly_chart(fig_product_sales)
+fig_product_sales.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=(dict(showgrid=False))
+)
 
 
 
 
+# Sales by hour [Bar chart]
+sales_by_hour = df_selection.groupby(by=["hour"]).sum()[["Total"]]
+fig_hourly_sales = px.bar(
+        sales_by_hour,
+        x=sales_by_hour.index,
+        y="Total",
+        title="<b>Sales by hour</b>",
+        color_discrete_sequence=["#0083B8"] * len(sales_by_hour),
+        template="plotly_white",
+)
+
+fig_hourly_sales.update_layout(
+        xaxis=dict(tickmode="linear"),
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis=(dict(showgrid=False)),
+)
+
+
+
+left_column, right_column = st.columns(2)
+left_column.plotly_chart(fig_hourly_sales, use_container_with=True)
+right_column.plotly_chart(fig_product_sales, use_container_with=True)
+
+
+# ---- Hide streamlit style ----
+hide_st_style ="""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 
 
